@@ -35,7 +35,7 @@ func NewSender(ip net.IP, p *Packet) (*Sender, error) {
 	}
 
 	// RFC 2974, section 3.1
-	bandwidthLimit := 1000
+	bandwidthLimit := 4000
 	intervalSeconds := (8 * len(raw)) / bandwidthLimit
 
 	if intervalSeconds < 300 {
