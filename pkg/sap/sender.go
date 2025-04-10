@@ -2,21 +2,43 @@ package sap
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"net"
 	"time"
 )
 
-type Sender struct {
-	conn            *net.UDPConn
-	raw             []byte
-	intervalSeconds int
+const (
+	bandwidthLimitBits = 4000
+	minIntervalDefault = 300 * time.Second
+)
+
+type config struct {
+	minInterval time.Duration
 }
 
-func NewSender(ip net.IP, p *Packet) (*Sender, error) {
+type Option func(o *config)
+
+func WithMinInterval(interval time.Duration) Option {
+	return func(c *config) {
+		c.minInterval = interval
+	}
+}
+
+func AnnouncePeriodically(ctx context.Context, ip net.IP, p *Packet, opts ...Option) error {
+	c := config{
+		minInterval: minIntervalDefault,
+	}
+
+	for _, opt := range opts {
+		opt(&c)
+	}
+
+	p.Type = MessageTypeAnnouncement
+
 	raw, err := p.Encode()
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("encoding announcement package: %w", err)
 	}
 
 	udpAddr := &net.UDPAddr{
@@ -31,43 +53,46 @@ func NewSender(ip net.IP, p *Packet) (*Sender, error) {
 
 	conn, err := net.DialUDP(network, nil, udpAddr)
 	if err != nil {
-		return nil, err
+		return err
 	}
+
+	defer conn.Close()
 
 	// RFC 2974, section 3.1
-	bandwidthLimit := 1000
-	intervalSeconds := (8 * len(raw)) / bandwidthLimit
+	interval := time.Duration(8*len(raw)/bandwidthLimitBits) * time.Second
 
-	if intervalSeconds < 300 {
-		intervalSeconds = 300
+	if interval < c.minInterval {
+		interval = c.minInterval
 	}
 
-	return &Sender{
-		conn:            conn,
-		raw:             raw,
-		intervalSeconds: intervalSeconds,
-	}, nil
-}
+	intervalSec := int(interval / time.Second)
 
-func (s *Sender) AnnouncePeriodically(ctx context.Context) error {
 	for {
-		_, err := s.conn.Write(s.raw)
+		_, err := conn.Write(raw)
 		if err != nil {
-			return err
+			return fmt.Errorf("sending announcement package: %w", err)
 		}
 
 		// RFC 2974, section 3.1
-		offsetSeconds := s.intervalSeconds
-		offsetSeconds += rand.Intn(s.intervalSeconds*2/3) - s.intervalSeconds/3
+		offset := time.Duration(rand.Intn(intervalSec*2/3)-intervalSec/3) * time.Second
 
 		select {
 		case <-ctx.Done():
+			p.Type = MessageTypeDeletion
+
+			raw, err := p.Encode()
+			if err != nil {
+				return fmt.Errorf("encoding deletion package: %w", err)
+			}
+
+			_, err = conn.Write(raw)
+			if err != nil {
+				return fmt.Errorf("sending deletion package: %w", err)
+			}
+
 			return ctx.Err()
-		case <-time.After(time.Duration(offsetSeconds) * time.Second):
+
+		case <-time.After(interval + offset):
 		}
 	}
-}
-
-func (s *Sender) Close() {
-	s.conn.Close()
 }
