@@ -19,19 +19,26 @@ func main() {
 	}
 
 	p := &sap.Packet{
-		Type:        sap.MessageTypeAnnouncement,
 		IDHash:      0x2342,
 		Origin:      net.ParseIP("192.168.1.100"),
 		PayloadType: sap.SDPPayloadType,
 		Payload:     sdp,
 	}
 
-	s, err := sap.NewSender(net.ParseIP("239.255.255.255"), p)
-	if err != nil {
-		panic(err)
-	}
+	ctx, cancel := context.WithCancel(context.Background())
 
-	s.AnnouncePeriodically(context.Background())
+	go func() {
+		// This blocks
+		err := sap.AnnouncePeriodically(ctx, net.ParseIP("239.255.255.255"), p)
+		if err != nil && !errors.Is(err, context.Canceled) {
+			panic(err)
+		}
+	}()
+
+	time.Sleep(2 * time.Second())
+
+	// Send the deletion package and stop announcing.
+	cancel()
 }
 ```
 

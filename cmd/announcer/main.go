@@ -37,11 +37,6 @@ func main() {
 		),
 	}
 
-	s, err := sap.NewSender(ip, p)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to listen")
-	}
-
 	ctx := context.Background()
 
 	if *timeoutFlag > 0 {
@@ -55,7 +50,7 @@ func main() {
 		Str("payload-type", p.PayloadType).
 		Msg("Sending announcements periodically")
 
-	if err := s.AnnouncePeriodically(ctx); err != nil && !errors.Is(err, context.DeadlineExceeded) {
+	if err := sap.AnnouncePeriodically(ctx, ip, p); err != nil && !errors.Is(err, context.DeadlineExceeded) {
 		log.Fatal().Err(err).Msg("Failed to announce periodically")
 	}
 }
