@@ -2,15 +2,18 @@ package sap
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"net"
 	"time"
 )
 
 func AnnouncePeriodically(ctx context.Context, ip net.IP, p *Packet) error {
+	p.Type = MessageTypeAnnouncement
+
 	raw, err := p.Encode()
 	if err != nil {
-		return err
+		return fmt.Errorf("encoding announcement package: %w", err)
 	}
 
 	udpAddr := &net.UDPAddr{
@@ -41,7 +44,7 @@ func AnnouncePeriodically(ctx context.Context, ip net.IP, p *Packet) error {
 	for {
 		_, err := conn.Write(raw)
 		if err != nil {
-			return err
+			return fmt.Errorf("sending announcement package: %w", err)
 		}
 
 		// RFC 2974, section 3.1
@@ -50,7 +53,20 @@ func AnnouncePeriodically(ctx context.Context, ip net.IP, p *Packet) error {
 
 		select {
 		case <-ctx.Done():
+			p.Type = MessageTypeDeletion
+
+			raw, err := p.Encode()
+			if err != nil {
+				return fmt.Errorf("encoding deletion package: %w", err)
+			}
+
+			_, err = conn.Write(raw)
+			if err != nil {
+				return fmt.Errorf("sending deletion package: %w", err)
+			}
+
 			return ctx.Err()
+
 		case <-time.After(time.Duration(offsetSeconds) * time.Second):
 		}
 	}
