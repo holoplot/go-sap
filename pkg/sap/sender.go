@@ -50,6 +50,8 @@ func NewSender(ip net.IP, p *Packet) (*Sender, error) {
 }
 
 func (s *Sender) AnnouncePeriodically(ctx context.Context) error {
+	defer s.conn.Close()
+
 	for {
 		_, err := s.conn.Write(s.raw)
 		if err != nil {
@@ -66,8 +68,4 @@ func (s *Sender) AnnouncePeriodically(ctx context.Context) error {
 		case <-time.After(time.Duration(offsetSeconds) * time.Second):
 		}
 	}
-}
-
-func (s *Sender) Close() {
-	s.conn.Close()
 }
