@@ -7,16 +7,10 @@ import (
 	"time"
 )
 
-type Sender struct {
-	conn            *net.UDPConn
-	raw             []byte
-	intervalSeconds int
-}
-
-func NewSender(ip net.IP, p *Packet) (*Sender, error) {
+func AnnouncePeriodically(ctx context.Context, ip net.IP, p *Packet) error {
 	raw, err := p.Encode()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	udpAddr := &net.UDPAddr{
@@ -31,8 +25,10 @@ func NewSender(ip net.IP, p *Packet) (*Sender, error) {
 
 	conn, err := net.DialUDP(network, nil, udpAddr)
 	if err != nil {
-		return nil, err
+		return err
 	}
+
+	defer conn.Close()
 
 	// RFC 2974, section 3.1
 	bandwidthLimit := 4000
@@ -42,25 +38,15 @@ func NewSender(ip net.IP, p *Packet) (*Sender, error) {
 		intervalSeconds = 300
 	}
 
-	return &Sender{
-		conn:            conn,
-		raw:             raw,
-		intervalSeconds: intervalSeconds,
-	}, nil
-}
-
-func (s *Sender) AnnouncePeriodically(ctx context.Context) error {
-	defer s.conn.Close()
-
 	for {
-		_, err := s.conn.Write(s.raw)
+		_, err := conn.Write(raw)
 		if err != nil {
 			return err
 		}
 
 		// RFC 2974, section 3.1
-		offsetSeconds := s.intervalSeconds
-		offsetSeconds += rand.Intn(s.intervalSeconds*2/3) - s.intervalSeconds/3
+		offsetSeconds := intervalSeconds
+		offsetSeconds += rand.Intn(intervalSeconds*2/3) - intervalSeconds/3
 
 		select {
 		case <-ctx.Done():
