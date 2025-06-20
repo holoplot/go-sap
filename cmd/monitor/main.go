@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"os"
 
 	"github.com/holoplot/go-sap/pkg/sap"
 	"github.com/mattn/go-colorable"
@@ -14,6 +15,7 @@ import (
 func main() {
 	ipFlag := flag.String("dest", "239.255.255.255", "Multicast group to listen to")
 	ifaceFlag := flag.String("iface", "", "Interface name to use")
+	writeFileFlag := flag.Bool("write-file", false, "Write packets to files in the current directory")
 	flag.Parse()
 
 	consoleWriter := zerolog.ConsoleWriter{
@@ -64,5 +66,20 @@ func main() {
 			Str("id-hash", fmt.Sprintf("%04x", p.IDHash)).
 			Str("payload-type", p.PayloadType).
 			Msg("Packet received")
+
+		if *writeFileFlag {
+			filename := fmt.Sprintf("%04x.sdp", p.IDHash)
+			f, err := os.Create(filename)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to create file")
+				continue
+			}
+
+			if _, err := f.Write(p.Payload); err != nil {
+				log.Error().Err(err).Msg("Failed to write packet to file")
+			}
+
+			f.Close()
+		}
 	}
 }
