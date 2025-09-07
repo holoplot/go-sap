@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"net"
+	"os"
 	"time"
 
 	"github.com/holoplot/go-sap/pkg/sap"
@@ -17,6 +18,7 @@ func main() {
 	destFlag := flag.String("dest", "239.255.255.255", "Multicast group to listen to")
 	originFlag := flag.String("origin", "192.168.1.100", "Origin to use in sent packets")
 	timeoutFlag := flag.Int("timeout", 0, "Timeout in seconds (0 for disable)")
+	sdpFlag := flag.String("sdp", "sdp.txt", "SDP file to use as payload")
 	flag.Parse()
 
 	consoleWriter := zerolog.ConsoleWriter{
@@ -27,14 +29,17 @@ func main() {
 
 	ip := net.ParseIP(*destFlag)
 
+	b, err := os.ReadFile(*sdpFlag)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to read SDP file")
+	}
+
 	p := &sap.Packet{
 		Type:        sap.MessageTypeAnnouncement,
 		IDHash:      0x2342,
 		Origin:      net.ParseIP(*originFlag),
 		PayloadType: sap.SDPPayloadType,
-		Payload: []byte(
-			`xxx`,
-		),
+		Payload:     b,
 	}
 
 	ctx := context.Background()
