@@ -4,14 +4,13 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"log/slog"
 	"net"
 	"os"
 	"time"
 
+	"github.com/holoplot/go-sap/pkg/logger"
 	"github.com/holoplot/go-sap/pkg/sap"
-	"github.com/mattn/go-colorable"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 func main() {
@@ -21,17 +20,15 @@ func main() {
 	sdpFlag := flag.String("sdp", "sdp.txt", "SDP file to use as payload")
 	flag.Parse()
 
-	consoleWriter := zerolog.ConsoleWriter{
-		Out: colorable.NewColorableStdout(),
-	}
-
-	log.Logger = log.Output(consoleWriter)
+	logger.Setup()
 
 	ip := net.ParseIP(*destFlag)
 
 	b, err := os.ReadFile(*sdpFlag)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to read SDP file")
+		slog.Error("Failed to read SDP file", "error", err)
+
+		os.Exit(1)
 	}
 
 	p := &sap.Packet{
@@ -45,17 +42,20 @@ func main() {
 	ctx := context.Background()
 
 	if *timeoutFlag > 0 {
-		ctx, _ = context.WithDeadline(ctx, time.Now().Add(time.Duration(*timeoutFlag)*time.Second))
+		var cancel context.CancelFunc
+
+		ctx, cancel = context.WithDeadline(ctx, time.Now().Add(time.Duration(*timeoutFlag)*time.Second))
+		defer cancel()
 	}
 
-	log.Info().
-		IPAddr("dest", ip).
-		IPAddr("origin", p.Origin).
-		Int("timeout", *timeoutFlag).
-		Str("payload-type", p.PayloadType).
-		Msg("Sending announcements periodically")
+	slog.Info("Sending announcements periodically",
+		"dest", ip,
+		"origin", p.Origin,
+		"timeout", *timeoutFlag,
+		"payload-type", p.PayloadType,
+	)
 
 	if err := sap.AnnouncePeriodically(ctx, ip, p); err != nil && !errors.Is(err, context.DeadlineExceeded) {
-		log.Fatal().Err(err).Msg("Failed to announce periodically")
+		slog.Error("Failed to announce periodically", "error", err)
 	}
 }

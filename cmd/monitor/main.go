@@ -3,13 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 
+	"github.com/holoplot/go-sap/pkg/logger"
 	"github.com/holoplot/go-sap/pkg/sap"
-	"github.com/mattn/go-colorable"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 func main() {
@@ -18,11 +17,7 @@ func main() {
 	writeFileFlag := flag.Bool("write-file", false, "Write packets to files in the current directory")
 	flag.Parse()
 
-	consoleWriter := zerolog.ConsoleWriter{
-		Out: colorable.NewColorableStdout(),
-	}
-
-	log.Logger = log.Output(consoleWriter)
+	logger.Setup()
 
 	var ifi *net.Interface
 
@@ -31,7 +26,8 @@ func main() {
 
 		ifi, err = net.InterfaceByName(*ifaceFlag)
 		if err != nil {
-			log.Fatal().Err(err).Msg("No such interface")
+			slog.Error("No such interface", "error", err)
+			os.Exit(1)
 		}
 	}
 
@@ -39,44 +35,45 @@ func main() {
 
 	l, err := sap.NewListener(ip, ifi)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to listen")
+		slog.Error("Failed to listen", "error", err)
+		os.Exit(1)
 	}
 
-	log.Info().Msg("Listening for packets")
+	slog.Info("Listening for packets")
 
 	for {
 		b, err := l.ReadPacketRaw()
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to read raw packet")
+			slog.Error("Failed to read packet", "error", err)
 
 			return
 		}
 
 		p, err := sap.DecodePacket(b)
 		if err != nil {
-			log.Error().Err(err).Stack().Msg("Failed to decode packet")
+			slog.Error("Failed to decode packet", "error", err)
 
 			continue
 		}
 
-		log.Info().
-			IPAddr("origin", p.Origin).
-			Bool("compressed", p.Compressed).
-			Bool("is-announcement", p.Type == sap.MessageTypeAnnouncement).
-			Str("id-hash", fmt.Sprintf("%04x", p.IDHash)).
-			Str("payload-type", p.PayloadType).
-			Msg("Packet received")
+		slog.Info("Packet received",
+			"origin", p.Origin,
+			"compressed", p.Compressed,
+			"is-announcement", p.Type == sap.MessageTypeAnnouncement,
+			"id-hash", fmt.Sprintf("%04x", p.IDHash),
+			"payload-type", p.PayloadType,
+		)
 
 		if *writeFileFlag {
 			filename := fmt.Sprintf("%04x.sdp", p.IDHash)
 			f, err := os.Create(filename)
 			if err != nil {
-				log.Error().Err(err).Msg("Failed to create file")
+				slog.Error("Failed to create file", "error", err)
 				continue
 			}
 
 			if _, err := f.Write(p.Payload); err != nil {
-				log.Error().Err(err).Msg("Failed to write packet to file")
+				slog.Error("Failed to write packet to file", "error", err)
 			}
 
 			f.Close()
