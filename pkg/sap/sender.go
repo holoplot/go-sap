@@ -59,11 +59,7 @@ func AnnouncePeriodically(ctx context.Context, ip net.IP, p *Packet, opts ...Opt
 	defer conn.Close()
 
 	// RFC 2974, section 3.1
-	interval := time.Duration(8*len(raw)/bandwidthLimitBits) * time.Second
-
-	if interval < c.minInterval {
-		interval = c.minInterval
-	}
+	interval := max(time.Duration(8*len(raw)/bandwidthLimitBits)*time.Second, c.minInterval)
 
 	intervalSec := int(interval / time.Second)
 
