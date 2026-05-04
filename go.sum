@@ -1,5 +1,5 @@
-github.com/holoplot/go-multicast v0.0.0-20250911190907-ab1df3c58063 h1:h2OFls0mFZgatQTMhGKLroMEG80C82aasVLaGlEe790=
-github.com/holoplot/go-multicast v0.0.0-20250911190907-ab1df3c58063/go.mod h1:69D70nBT3OklGIFHeDSRmmdXiuM270T6Yh2rLAZhc9c=
+github.com/holoplot/go-multicast v0.0.0-20260504092619-2d0e496f124f h1:cD8Md040LUMkrg21ARoQaDJuB9lrsT4cFcxHEU0dxiA=
+github.com/holoplot/go-multicast v0.0.0-20260504092619-2d0e496f124f/go.mod h1:riPGe6//GMwG9MgSijnNNu0WBnYLETtS3r8xVQMckhQ=
 github.com/lmittmann/tint v1.1.3 h1:Hv4EaHWXQr+GTFnOU4VKf8UvAtZgn0VuKT+G0wFlO3I=
 github.com/lmittmann/tint v1.1.3/go.mod h1:HIS3gSy7qNwGCj+5oRjAutErFBl4BzdQP6cJZ0NfMwE=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
