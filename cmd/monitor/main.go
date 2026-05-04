@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log/slog"
 	"net"
 	"os"
 
+	"github.com/holoplot/go-multicast/pkg/multicast"
 	"github.com/holoplot/go-sap/pkg/logger"
 	"github.com/holoplot/go-sap/pkg/sap"
 )
@@ -19,41 +21,49 @@ func main() {
 
 	logger.Setup()
 
-	var ifi *net.Interface
+	ifis := []*net.Interface{}
 
 	if *ifaceFlag != "" {
 		var err error
 
-		ifi, err = net.InterfaceByName(*ifaceFlag)
+		ifi, err := net.InterfaceByName(*ifaceFlag)
 		if err != nil {
 			slog.Error("No such interface", "error", err)
 			os.Exit(1)
 		}
-	}
 
-	ip := net.ParseIP(*ipFlag)
-
-	l, err := sap.NewListener(ip, ifi)
-	if err != nil {
-		slog.Error("Failed to listen", "error", err)
-		os.Exit(1)
-	}
-
-	slog.Info("Listening for packets")
-
-	for {
-		b, err := l.ReadPacketRaw()
+		ifis = append(ifis, ifi)
+	} else {
+		allIfis, err := net.Interfaces()
 		if err != nil {
-			slog.Error("Failed to read packet", "error", err)
-
-			return
+			slog.Error("Failed to get network interfaces", "error", err)
+			os.Exit(1)
 		}
 
-		p, err := sap.DecodePacket(b)
+		for _, ifi := range allIfis {
+			if ifi.Flags&net.FlagMulticast == 0 {
+				continue
+			}
+
+			slog.Debug("Adding interface", "name", ifi.Name)
+
+			ifis = append(ifis, &ifi)
+		}
+	}
+
+	ml := multicast.NewListener(ifis)
+
+	addr := &net.UDPAddr{
+		IP:   net.ParseIP(*ipFlag),
+		Port: 9875,
+	}
+
+	if _, err := ml.AddConsumer(addr, func(ifi *net.Interface, src net.Addr, payload []byte) {
+		p, err := sap.DecodePacket(payload)
 		if err != nil {
 			slog.Error("Failed to decode packet", "error", err)
 
-			continue
+			return
 		}
 
 		slog.Info("Packet received",
@@ -69,7 +79,7 @@ func main() {
 			f, err := os.Create(filename)
 			if err != nil {
 				slog.Error("Failed to create file", "error", err)
-				continue
+				return
 			}
 
 			if _, err := f.Write(p.Payload); err != nil {
@@ -78,5 +88,12 @@ func main() {
 
 			f.Close()
 		}
+	}); err != nil {
+		slog.Error("Failed to add consumer", "error", err)
+		os.Exit(1)
 	}
+
+	slog.Info("Listening for packets")
+
+	<-context.Background().Done()
 }

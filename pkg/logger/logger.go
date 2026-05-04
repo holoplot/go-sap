@@ -9,7 +9,7 @@ import (
 
 func Setup() {
 	handler := tint.NewHandler(os.Stderr, &tint.Options{
-		Level:      slog.LevelInfo,
+		Level:      slog.LevelDebug,
 		TimeFormat: "15:04:05.000000",
 		NoColor:    os.Getenv("NO_COLOR") != "",
 		AddSource:  true,
